@@ -15,13 +15,16 @@ let hasDrawn = false;
 let currentGuessTarget = null;
 
 async function init() {
+    // กำหนดตัวตนผู้เล่น
     myId = localStorage.getItem("dv_uid") || "p_" + Math.random().toString(36).substr(2, 5);
     localStorage.setItem("dv_uid", myId);
     
+    // กำหนดห้องเกม
     gameId = window.location.hash.substring(1) || "room1";
     if (!window.location.hash) window.location.hash = "room1";
     document.getElementById("share-url").value = window.location.href;
 
+    // ฟังการเปลี่ยนแปลงข้อมูลจาก Firebase
     onValue(ref(db, `games/${gameId}`), (snapshot) => {
         gameData = snapshot.val();
         if (!gameData) {
@@ -35,20 +38,26 @@ async function init() {
 function setupRoom() {
     set(ref(db, `games/${gameId}`), {
         state: "LOBBY",
+        maxPlayers: 2, // ค่าเริ่มต้น
         seats: { 1: null, 2: null, 3: null, 4: null, 5: null, 6: null },
         players: {},
         deck: [],
         turn: null,
-        logs: ["รอผู้เข้าแข่งขัน..."]
+        logs: ["ยินดีต้อนรับสู่ห้องลับดาวินชี..."]
     });
 }
 
 function render() {
+    if (!gameData) return;
+
     const isMyTurn = gameData.turn === myId;
-    document.getElementById("game-status").innerText = isMyTurn ? "🔒 ตาของคุณในการถอดรหัส" : "⏳ รอคู่ต่อสู้ดำเนินการ...";
+    const statusEl = document.getElementById("game-status");
+    statusEl.innerText = isMyTurn ? "🔒 ตาของคุณ: โปรดวิเคราะห์รหัส" : "⏳ รอสายลับท่านอื่นดำเนินการ...";
+    if (isMyTurn) statusEl.classList.add("my-turn");
+    else statusEl.classList.remove("my-turn");
 
     if (gameData.state === "LOBBY") {
-        document.getElementById("lobby-screen").style.display = "block";
+        document.getElementById("lobby-screen").style.display = "flex";
         document.getElementById("game-board").style.display = "none";
         renderLobby();
     } else {
@@ -59,30 +68,50 @@ function render() {
 }
 
 function renderLobby() {
+    // แสดงตัวเลือกจำนวนผู้เล่นสูงสุด (เฉพาะคนแรกที่เข้าห้อง หรือระบบ Admin ง่ายๆ)
+    const settingsArea = document.getElementById("lobby-settings");
+    settingsArea.innerHTML = `
+        <label>จำนวนผู้เล่นสูงสุดในรอบนี้:</label>
+        <select onchange="window.updateMaxPlayers(this.value)">
+            ${[2,3,4,5,6].map(n => `<option value="${n}" ${gameData.maxPlayers == n ? 'selected' : ''}>${n} ท่าน</option>`).join('')}
+        </select>
+    `;
+
     const grid = document.getElementById("seat-grid");
     grid.innerHTML = "";
-    for (let i = 1; i <= 6; i++) {
+    for (let i = 1; i <= gameData.maxPlayers; i++) {
         const occupant = gameData.seats[i];
         const btn = document.createElement("button");
-        btn.className = `seat-btn ${occupant ? 'taken' : ''}`;
-        btn.innerHTML = occupant ? (occupant === myId ? "ที่นั่งของคุณ" : "มีผู้อื่นนั่งแล้ว") : `ที่นั่งว่าง ${i}`;
+        btn.className = `seat-card ${occupant ? 'occupied' : 'vacant'} ${occupant === myId ? 'is-me' : ''}`;
+        
+        btn.innerHTML = `
+            <div class="seat-number">ที่นั่ง ${i}</div>
+            <div class="occupant-name">${occupant ? (occupant === myId ? "คุณ (สายลับ)" : "สายลับท่านอื่น") : "ว่าง"}</div>
+        `;
+        
         if (!occupant) btn.onclick = () => selectSeat(i);
         grid.appendChild(btn);
     }
 }
 
+window.updateMaxPlayers = (val) => {
+    update(ref(db, `games/${gameId}`), { maxPlayers: parseInt(val) });
+};
+
 window.selectSeat = (num) => {
     const seats = { ...gameData.seats };
+    // ลุกจากที่นั่งเดิม
     for (let s in seats) if (seats[s] === myId) seats[s] = null;
+    // นั่งที่ใหม่
     seats[num] = myId;
     update(ref(db, `games/${gameId}`), { seats });
 };
 
 window.startGame = () => {
     const activeUids = Object.values(gameData.seats).filter(u => u !== null);
-    if (activeUids.length < 2) return alert("ต้องการผู้เล่นอย่างน้อย 2 คน");
+    if (activeUids.length < 2) return alert("ต้องการผู้เล่นอย่างน้อย 2 คนเพื่อเริ่มการถอดรหัส");
 
-    // สร้างไพ่ 0-11 ขาวดำ (อ้างอิง gameLogic.ts)
+    // สร้างสำรับไพ่ 0-11 ขาวดำ
     let deck = [];
     for (let i = 0; i <= 11; i++) {
         deck.push({ v: i, c: 'black', revealed: false });
@@ -107,35 +136,39 @@ window.startGame = () => {
 };
 
 function renderGame() {
-    // แสดงไพ่เรา
+    // แสดงไพ่ของเราเอง (เห็นเลขทั้งหมด)
     const myHand = document.getElementById("my-hand");
     myHand.innerHTML = "";
     if (gameData.players[myId]) {
         gameData.players[myId].hand.forEach(t => {
             const d = document.createElement("div");
             d.className = `tile ${t.c} ${t.revealed ? 'revealed' : ''}`;
-            d.innerText = t.v;
+            d.innerHTML = `<span class="tile-value">${t.v}</span>`;
             myHand.appendChild(d);
         });
     }
 
-    // แสดงไพ่คู่ต่อสู้
+    // แสดงไพ่คู่ต่อสู้ (เห็นเฉพาะใบที่ถูกเปิดเผย)
     const oppCont = document.getElementById("opponents-container");
     oppCont.innerHTML = "";
     Object.keys(gameData.players).forEach(uid => {
         if (uid === myId) return;
         const p = gameData.players[uid];
         const div = document.createElement("div");
-        div.className = "opponent-box";
-        div.innerHTML = `<h4>สายลับ ${uid.slice(0,4)}</h4>`;
+        div.className = "opponent-section";
+        div.innerHTML = `<div class="opponent-header">สายลับ: ${uid.slice(0, 5)}</div>`;
+        
         const hand = document.createElement("div");
-        hand.className = "hand";
+        hand.className = "hand mini";
         p.hand.forEach((t, i) => {
             const d = document.createElement("div");
             d.className = `tile ${t.c} ${t.revealed ? 'revealed' : 'hidden'}`;
-            d.innerText = t.revealed ? t.v : "?";
+            d.innerHTML = `<span class="tile-value">${t.revealed ? t.v : "?"}</span>`;
+            
+            // ถ้าเป็นตาเรา และเราจั่วไพ่แล้ว สามารถเลือกทายไพ่คู่ต่อสู้ได้
             if (gameData.turn === myId && hasDrawn && !t.revealed) {
                 d.onclick = () => openGuessModal(uid, i);
+                d.classList.add("targetable");
             }
             hand.appendChild(d);
         });
@@ -144,14 +177,18 @@ function renderGame() {
     });
 
     document.getElementById("deck-count").innerText = gameData.deck.length;
-    document.getElementById("draw-btn").style.display = (gameData.turn === myId && !hasDrawn) ? "block" : "none";
+    document.getElementById("draw-btn").style.display = (gameData.turn === myId && !hasDrawn) ? "inline-block" : "none";
 }
 
 window.drawTile = () => {
-    if (gameData.deck.length === 0) { hasDrawn = true; render(); return; }
+    if (gameData.deck.length === 0) {
+        hasDrawn = true;
+        render();
+        return;
+    }
     const deck = [...gameData.deck];
     const tile = deck.pop();
-    tile.isNew = true; // มาร์คว่าเป็นใบใหม่
+    tile.isNew = true; 
     const hand = sortTiles([...gameData.players[myId].hand, tile]);
     
     hasDrawn = true;
@@ -164,11 +201,11 @@ window.drawTile = () => {
 function openGuessModal(uid, idx) {
     currentGuessTarget = { uid, idx };
     document.getElementById("guess-modal").style.display = "flex";
-    const grid = document.querySelector(".guess-grid");
+    const grid = document.getElementById("guess-number-grid");
     grid.innerHTML = "";
     for (let i = 0; i <= 11; i++) {
         const b = document.createElement("button");
-        b.className = "action-btn";
+        b.className = "guess-num-btn";
         b.innerText = i;
         b.onclick = () => submitGuess(i);
         grid.appendChild(b);
@@ -181,14 +218,16 @@ function submitGuess(num) {
     const isCorrect = targetHand[idx].v === num;
 
     if (isCorrect) {
-        alert("ถอดรหัสสำเร็จ!");
+        alert("🎉 ยอดเยี่ยม! คุณถอดรหัสสำเร็จ");
         targetHand[idx].revealed = true;
         const updates = {};
         updates[`games/${gameId}/players/${uid}/hand`] = targetHand;
         update(ref(db), updates);
-        document.getElementById("end-turn-btn").style.display = "block";
+        
+        // ให้เลือกว่าจะทายต่อหรือจบเทิร์น
+        document.getElementById("end-turn-btn").style.display = "inline-block";
     } else {
-        alert("พลาด! รหัสของคุณจะถูกเปิดเผย");
+        alert("❌ พลาด! คุณต้องเปิดเผยรหัสลับของตัวเองหนึ่งใบ");
         revealMyTile();
         window.endTurn();
     }
@@ -199,10 +238,14 @@ function revealMyTile() {
     const myHand = [...gameData.players[myId].hand];
     const hidden = myHand.filter(t => !t.revealed);
     if (hidden.length > 0) {
-        // ในกติกาจริง ใบที่เพิ่งจั่วมาต้องถูกเปิดถ้าทายผิด
+        // กฎ: ถ้าทายผิด ต้องเปิดไพ่ใบที่เพิ่งจั่วมา (ถ้ามี)
         const newTile = myHand.find(t => t.isNew);
         if (newTile) newTile.revealed = true;
-        else hidden[0].revealed = true;
+        else {
+            // ถ้าไม่มีใบที่เพิ่งจั่ว (กรณีไม่มีไพ่ให้จั่วแล้ว) ให้เปิดใบซ้ายสุดที่ยังไม่เปิด
+            const firstHidden = myHand.find(t => !t.revealed);
+            if (firstHidden) firstHidden.revealed = true;
+        }
         
         myHand.forEach(t => delete t.isNew);
         update(ref(db, `games/${gameId}/players/${myId}`), { hand: myHand });
@@ -217,10 +260,14 @@ window.endTurn = () => {
     update(ref(db, `games/${gameId}`), { turn: pids[nextIdx] });
 };
 
-window.closeGuessModal = () => document.getElementById("guess-modal").style.display = "none";
+window.closeGuessModal = () => {
+    document.getElementById("guess-modal").style.display = "none";
+};
 
 function sortTiles(tiles) {
+    // เรียงเลขน้อยไปมาก ถ้าเลขเท่ากัน สีดำต้องอยู่ก่อนสีขาว (กฎมาตรฐาน)
     return tiles.sort((a, b) => (a.v === b.v) ? (a.c === 'black' ? -1 : 1) : a.v - b.v);
 }
 
+// เริ่มการทำงาน
 init();
