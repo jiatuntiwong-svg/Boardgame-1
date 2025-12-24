@@ -1,0 +1,13 @@
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #2c2f33; color: white; text-align: center; }
+.hand { display: flex; justify-content: center; min-height: 100px; margin: 20px; }
+.tile {
+    width: 60px; height: 90px; border-radius: 8px; margin: 5px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; font-weight: bold; cursor: pointer; border: 3px solid transparent;
+}
+.tile.black { background: #000; color: #fff; border-color: #444; }
+.tile.white { background: #fff; color: #000; border-color: #ccc; }
+.tile.hidden { color: transparent; background-image: radial-gradient(#888 10%, transparent 11%); background-size: 10px 10px; }
+.tile.selected { border-color: #ffaa00; }
+.hidden { display: none; }
+#game-status { font-size: 1.2em; padding: 10px; color: #faa61a; }

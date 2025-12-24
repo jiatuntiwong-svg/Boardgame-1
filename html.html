@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Da Vinci Code - Discord Activity</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="app">
+        <div id="game-status">กำลังเชื่อมต่อ...</div>
+        
+        <div class="player-section" id="opponent-section">
+            <h3>ไพ่ของคู่ต่อสู้</h3>
+            <div id="opponent-hand" class="hand"></div>
+        </div>
+
+        <div id="center-pile">
+            <div id="deck-info">ไพ่ในกองเหลือ: <span id="deck-count">0</span> ใบ</div>
+            <button id="draw-btn" class="hidden">จั่วไพ่ (Clue Tile)</button>
+        </div>
+
+        <div id="guess-panel" class="hidden">
+            <p>ทายเลขไพ่ใบที่เลือก:</p>
+            <input type="number" id="guess-input" min="0" max="11">
+            <button id="submit-guess">ส่งคำตอบ</button>
+        </div>
+
+        <div class="player-section" id="my-section">
+            <h3>ไพ่ของคุณ (เรียงตามกฎ )</h3>
+            <div id="my-hand" class="hand"></div>
+            <div id="my-clue-tile"></div>
+        </div>
+    </div>
+
+    <script type="module" src="main.js"></script>
+</body>
+</html>
