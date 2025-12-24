@@ -2,7 +2,7 @@ import { DiscordSDK } from "@discord/embedded-app-sdk";
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, set, onValue, update } from "firebase/database";
 
-// 1. Firebase Configuration
+// 1. Firebase Config
 const firebaseConfig = {
     apiKey: "AIzaSyBMoaV77NoBNY3oBqQrmOuyPYyzP97N-ko",
     databaseURL: "https://boardgame-59909-default-rtdb.asia-southeast1.firebasedatabase.app",
@@ -13,7 +13,7 @@ const db = getDatabase(app);
 
 let myId, gameId, gameData;
 
-// 2. เริ่มต้นระบบ (Identity)
+// 2. เริ่มต้นระบบระบุตัวตน
 async function init() {
     try {
         const discordSdk = new DiscordSDK("1318854457788104764");
@@ -22,12 +22,16 @@ async function init() {
         myId = auth.user.id;
         gameId = discordSdk.channelId;
     } catch (e) {
-        // สำหรับทดสอบบน Web ปกติ
+        // Fallback สำหรับ Web Browser ปกติ
         myId = localStorage.getItem("dv_uid") || "p_" + Math.random().toString(36).substr(2, 5);
         localStorage.setItem("dv_uid", myId);
-        gameId = window.location.hash.substring(1) || "lobby";
-        if (!window.location.hash) window.location.hash = "lobby";
+        gameId = window.location.hash.substring(1) || "room1";
+        if (!window.location.hash) window.location.hash = "room1";
     }
+
+    // แสดง URL สำหรับแชร์ในหน้า Lobby
+    const shareInput = document.getElementById("share-url");
+    if(shareInput) shareInput.value = window.location.href;
 
     // ติดตามข้อมูลจาก Firebase
     const gameRef = ref(db, `games/${gameId}`);
@@ -36,17 +40,32 @@ async function init() {
         if (!gameData) {
             setupNewGame();
         } else {
-            // ระบบ Join เมื่อมีผู้เล่นคนที่ 2 เข้ามา
-            if (!gameData.players[myId] && Object.keys(gameData.players).length < 2) {
-                joinGame();
-            } else {
-                renderGame();
-            }
+            handleGameState();
         }
     });
 }
 
-// 3. Game Logic (แจกไพ่และเรียงไพ่)
+// 3. จัดการสถานะหน้าจอ (Lobby vs Board)
+function handleGameState() {
+    const players = gameData.players || {};
+    const playerCount = Object.keys(players).length;
+
+    if (playerCount < 2) {
+        if (!players[myId]) {
+            joinGame();
+        } else {
+            document.getElementById("lobby-screen").style.display = "block";
+            document.getElementById("game-board").style.display = "none";
+            document.getElementById("game-status").innerText = "กำลังรอผู้เล่นคนที่ 2...";
+        }
+    } else {
+        document.getElementById("lobby-screen").style.display = "none";
+        document.getElementById("game-board").style.display = "block";
+        renderGame();
+    }
+}
+
+// 4. กฎเกม (Logic)
 function setupNewGame() {
     const deck = [];
     for (let i = 0; i <= 11; i++) {
@@ -60,18 +79,15 @@ function setupNewGame() {
 
     set(ref(db, `games/${gameId}`), {
         deck,
-        players: {
-            [myId]: { hand: p1Hand, clueTile: null } // ใช้ ID จริงของผู้สร้าง
-        },
+        players: { [myId]: { hand: p1Hand, clueTile: null } },
         waitingHand: p2Hand, 
-        turn: myId,
-        state: "PLAYING"
+        turn: myId
     });
 }
 
 function joinGame() {
     const hand = sortTiles(gameData.waitingHand);
-    gameData.players[myId] = { hand: hand, clueTile: null }; // เพิ่ม ID ของคนที่มา Join
+    gameData.players[myId] = { hand: hand, clueTile: null };
     update(ref(db, `games/${gameId}`), { 
         players: gameData.players,
         waitingHand: null 
@@ -82,42 +98,39 @@ function sortTiles(tiles) {
     return tiles.sort((a, b) => (a.v === b.v) ? (a.c === 'black' ? -1 : 1) : a.v - b.v);
 }
 
-// 4. ระบบการเล่น (Actions)
+// 5. Actions (ผูกกับ window เพื่อให้ HTML เรียกได้)
 window.drawTile = () => {
-    if (gameData.turn !== myId || (gameData.players[myId] && gameData.players[myId].clueTile)) {
-        alert("ยังไม่ถึงตาคุณ หรือจั่วไปแล้ว!");
-        return;
-    }
+    if (gameData.turn !== myId || gameData.players[myId].clueTile) return;
     const newDeck = [...gameData.deck];
-    const drawnTile = newDeck.pop();
-    update(ref(db, `games/${gameId}/players/${myId}`), { clueTile: drawnTile });
-    update(ref(db, `games/${gameId}`), { deck: newDeck });
+    const drawn = newDeck.pop();
+    update(ref(db, `games/${gameId}`), {
+        deck: newDeck,
+        [`players/${myId}/clueTile`]: drawn
+    });
 };
 
 window.selectTile = (index) => {
     if (gameData.turn !== myId || !gameData.players[myId].clueTile) {
-        alert("ต้องจั่วไพ่ก่อนทาย!");
-        return;
+        alert("จั่วไพ่ก่อนทาย!"); return;
     }
-    const guess = prompt("ทายเลขไพ่ใบนี้ (0-11):");
+    const guess = prompt("ทายเลขใบนี้ (0-11):");
     if (guess === null) return;
 
-    const opponentId = Object.keys(gameData.players).find(id => id !== myId);
-    const targetTile = gameData.players[opponentId].hand[index];
+    const oppId = Object.keys(gameData.players).find(id => id !== myId);
+    const target = gameData.players[oppId].hand[index];
 
-    if (parseInt(guess) === targetTile.v) {
-        alert("ทายถูก!");
-        targetTile.revealed = true;
+    if (parseInt(guess) === target.v) {
+        alert("ถูกต้อง! ทายต่อหรือจบเทิร์น");
+        target.revealed = true;
         update(ref(db, `games/${gameId}`), gameData);
     } else {
-        alert("ทายผิด! ไพ่ที่คุณจั่วมาต้องเปิดเผย");
+        alert("ผิด! ต้องเปิดไพ่ตัวเอง");
         const clue = gameData.players[myId].clueTile;
         clue.revealed = true;
         gameData.players[myId].hand.push(clue);
         gameData.players[myId].hand = sortTiles(gameData.players[myId].hand);
         gameData.players[myId].clueTile = null;
         switchTurn();
-        update(ref(db, `games/${gameId}`), gameData);
     }
 };
 
@@ -129,55 +142,50 @@ window.endTurn = () => {
         gameData.players[myId].clueTile = null;
     }
     switchTurn();
-    update(ref(db, `games/${gameId}`), gameData);
 };
 
 function switchTurn() {
-    const players = Object.keys(gameData.players);
-    gameData.turn = players.find(id => id !== gameData.turn);
+    const ids = Object.keys(gameData.players);
+    gameData.turn = ids.find(id => id !== gameData.turn);
+    update(ref(db, `games/${gameId}`), gameData);
 }
 
-// 5. แสดงผล UI
+// 6. การแสดงผล
 function renderGame() {
     const me = gameData.players[myId];
-    if (!me) return;
-
     const isMyTurn = gameData.turn === myId;
-    document.getElementById("game-status").innerText = isMyTurn ? "ตาของคุณ!" : "รอคู่ต่อสู้...";
+    document.getElementById("game-status").innerText = isMyTurn ? "🔴 ตาของคุณ" : "⚪ รอคู่ต่อสู้...";
     document.getElementById("deck-count").innerText = gameData.deck.length;
 
-    // ปุ่มจบเทิร์น (แสดงเฉพาะเมื่อทายถูกและมีไพ่ในมือที่ยังไม่ได้เก็บ)
-    const endBtn = document.getElementById("end-turn-btn");
-    if (endBtn) endBtn.style.display = (isMyTurn && me.clueTile) ? "inline-block" : "none";
+    // ปุ่มควบคุม
+    document.getElementById("draw-btn").disabled = !!me.clueTile || !isMyTurn;
+    document.getElementById("end-turn-btn").style.display = (isMyTurn && me.clueTile) ? "inline-block" : "none";
 
-    // ไพ่ของเรา
-    const myHandDiv = document.getElementById("my-hand");
-    myHandDiv.innerHTML = "";
-    me.hand.forEach(tile => {
-        const div = document.createElement("div");
-        div.className = `tile ${tile.c} ${tile.revealed ? 'revealed' : ''}`;
-        div.innerText = tile.v;
-        myHandDiv.appendChild(div);
+    // ไพ่เรา
+    const myDiv = document.getElementById("my-hand");
+    myDiv.innerHTML = "";
+    me.hand.forEach(t => {
+        const d = document.createElement("div");
+        d.className = `tile ${t.c} ${t.revealed ? 'revealed' : ''}`;
+        d.innerText = t.v;
+        myDiv.appendChild(d);
     });
 
-    // ไพ่ที่เพิ่งจั่วได้ (Clue)
+    // ไพ่จั่ว (Clue)
     const clueArea = document.getElementById("clue-area");
-    clueArea.innerHTML = me.clueTile ? `<p>ไพ่ที่จั่ว: <span class="tile ${me.clueTile.c}">${me.clueTile.v}</span></p>` : "";
+    clueArea.innerHTML = me.clueTile ? `<p>ไพ่ที่เพิ่งจั่ว: <span class="tile ${me.clueTile.c}">${me.clueTile.v}</span></p>` : "";
 
-    // ไพ่ของคู่ต่อสู้
-    const opponentId = Object.keys(gameData.players).find(id => id !== myId);
-    const oppHandDiv = document.getElementById("opponent-hand");
-    oppHandDiv.innerHTML = "";
-    if (opponentId) {
-        gameData.players[opponentId].hand.forEach((tile, index) => {
-            const div = document.createElement("div");
-            // ถ้ายังไม่ถูกเปิดเผย ให้เป็นสีดำ/ขาวเปล่าๆ
-            div.className = `tile ${tile.c} ${tile.revealed ? 'revealed' : 'hidden'}`;
-            div.innerText = tile.revealed ? tile.v : "?";
-            div.onclick = () => window.selectTile(index);
-            oppHandDiv.appendChild(div);
-        });
-    }
+    // ไพ่คู่ต่อสู้
+    const oppId = Object.keys(gameData.players).find(id => id !== myId);
+    const oppDiv = document.getElementById("opponent-hand");
+    oppDiv.innerHTML = "";
+    gameData.players[oppId].hand.forEach((t, i) => {
+        const d = document.createElement("div");
+        d.className = `tile ${t.c} ${t.revealed ? 'revealed' : 'hidden'}`;
+        d.innerText = t.revealed ? t.v : "?";
+        d.onclick = () => window.selectTile(i);
+        oppDiv.appendChild(d);
+    });
 }
 
 init();
