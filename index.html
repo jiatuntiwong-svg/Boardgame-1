@@ -5,11 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Da Vinci Code Online</title>
     <link rel="stylesheet" href="style.css">
+    <!-- ฟอนต์ Cinzel และ Cormorant Garamond จากต้นแบบ -->
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Cormorant+Garamond:wght@400;600&display=swap" rel="stylesheet">
     
     <script type="importmap">
     {
       "imports": {
-        "@discord/embedded-app-sdk": "https://cdn.jsdelivr.net/npm/@discord/embedded-app-sdk@1.0.0/+esm",
         "firebase/app": "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js",
         "firebase/database": "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js"
       }
@@ -19,36 +20,55 @@
 </head>
 <body>
     <div id="game-container">
-        <div id="game-status" class="status-bar">กำลังเชื่อมต่อ...</div>
+        <div id="game-status" class="status-bar">เชื่อมต่อระบบลับ...</div>
 
+        <!-- หน้าล็อบบี้ -->
         <div id="lobby-screen" style="display: none;">
             <div class="lobby-box">
-                <h2>🎮 รอผู้เล่นร่วมสนุก</h2>
-                <p>ส่งลิงก์นี้ให้เพื่อนเพื่อเข้าเล่นในห้องเดียวกัน:</p>
-                <input type="text" id="share-url" readonly>
-                <div class="loader"></div>
+                <h1 class="ancient-title">DA VINCI CODE</h1>
+                <p class="subtitle">เลือกตำแหน่งที่นั่งบนโต๊ะไม้โอ๊ค</p>
+                <div id="seat-grid" class="seat-grid"></div>
+                <button id="start-btn" class="action-btn gold-glow" onclick="window.startGame()">🚀 เริ่มการถอดรหัส</button>
+                <div class="share-box">
+                    <input type="text" id="share-url" readonly onclick="this.select()">
+                </div>
             </div>
         </div>
 
+        <!-- กระดานเกม -->
         <div id="game-board" style="display: none;">
-            <div class="section">
-                <h3>ไพ่ของคู่ต่อสู้</h3>
-                <div id="opponent-hand" class="hand"></div>
+            <div id="opponents-container" class="opponents-wrapper"></div>
+
+            <div class="table-center">
+                <div class="deck-area">
+                    <div class="deck-count-circle">
+                        <span id="deck-count">0</span>
+                        <small>ไพ่ที่เหลือ</small>
+                    </div>
+                </div>
+                <div id="game-log" class="log-area">ยินดีต้อนรับสู่ห้องถอดรหัส...</div>
             </div>
 
-            <div class="game-info">
-                <p>🎴 ไพ่ในกองเหลือ: <b id="deck-count">0</b> ใบ</p>
-                <div id="clue-area"></div> </div>
-
-            <div class="controls">
-                <button id="draw-btn" onclick="drawTile()">จั่วไพ่ใหม่</button>
-                <button id="end-turn-btn" onclick="endTurn()" style="display:none;">จบเทิร์น (เก็บไพ่ลับ)</button>
+            <div class="player-controls">
+                <button id="draw-btn" class="action-btn" onclick="window.drawTile()">จั่วไพ่</button>
+                <button id="end-turn-btn" class="action-btn success" style="display:none;" onclick="window.endTurn()">จบเทิร์น</button>
             </div>
 
-            <div class="section">
-                <h3>ไพ่ของคุณ</h3>
+            <div class="my-section">
+                <h3 class="section-label">รหัสของคุณ</h3>
                 <div id="my-hand" class="hand"></div>
             </div>
+        </div>
+    </div>
+
+    <!-- Modal สำหรับทายตัวเลข -->
+    <div id="guess-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3>ทายรหัสลับ</h3>
+            <div class="guess-grid">
+                <!-- ปุ่ม 0-11 จะถูกสร้างที่นี่ -->
+            </div>
+            <button class="action-btn cancel" onclick="window.closeGuessModal()">ยกเลิก</button>
         </div>
     </div>
 </body>
