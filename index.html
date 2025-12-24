@@ -45,6 +45,18 @@
     </div>
 
     <script type="module" src="main.js"></script>
+
+    <div id="controls" style="text-align: center; margin-top: 20px;">
+    <button id="draw-btn" onclick="drawTile()" style="padding: 10px 20px; font-size: 16px; cursor: pointer;">จั่วไพ่ใหม่</button>
+    
+    <div id="clue-area" style="margin-top: 15px;">
+        <p>ไพ่ที่จั่วได้:</p>
+        <div id="clue-tile-display"></div>
+    </div>
+
+    <button id="end-turn-btn" onclick="endTurn()" style="display: none; padding: 10px 20px; background: #4CAF50; color: white; border: none; cursor: pointer;">จบเทิร์นและเก็บไพ่ลับ</button>
+</div>
 </body>
 </html>
+
 
