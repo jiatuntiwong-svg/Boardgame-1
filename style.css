@@ -1,13 +1,94 @@
-body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #2c2f33; color: white; text-align: center; }
-.hand { display: flex; justify-content: center; min-height: 100px; margin: 20px; }
-.tile {
-    width: 60px; height: 90px; border-radius: 8px; margin: 5px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 24px; font-weight: bold; cursor: pointer; border: 3px solid transparent;
+:root {
+    --wood-dark: #1a1410;
+    --wood-medium: #261d17;
+    --gold: #d4af37;
+    --parchment: #f5f2e9;
+    --parchment-dark: #e8e2d0;
 }
-.tile.black { background: #000; color: #fff; border-color: #444; }
-.tile.white { background: #fff; color: #000; border-color: #ccc; }
-.tile.hidden { color: transparent; background-image: radial-gradient(#888 10%, transparent 11%); background-size: 10px 10px; }
-.tile.selected { border-color: #ffaa00; }
-.hidden { display: none; }
-#game-status { font-size: 1.2em; padding: 10px; color: #faa61a; }
+
+body {
+    font-family: 'Cormorant Garamond', serif;
+    background-color: var(--wood-dark);
+    color: var(--parchment);
+    margin: 0;
+    overflow-x: hidden;
+}
+
+#game-container {
+    max-width: 1000px;
+    margin: 0 auto;
+    background: var(--wood-medium);
+    min-height: 100vh;
+    border-left: 2px solid var(--gold);
+    border-right: 2px solid var(--gold);
+    box-shadow: 0 0 50px rgba(0,0,0,0.8);
+}
+
+.ancient-title {
+    font-family: 'Cinzel', serif;
+    color: var(--gold);
+    font-size: 3rem;
+    letter-spacing: 5px;
+    margin-bottom: 5px;
+    text-shadow: 0 0 10px rgba(212, 175, 55, 0.5);
+}
+
+.status-bar {
+    background: #111;
+    color: var(--gold);
+    padding: 15px;
+    text-align: center;
+    font-family: 'Cinzel', serif;
+    border-bottom: 1px solid var(--gold);
+}
+
+/* ไพ่ (Tiles) */
+.hand { display: flex; gap: 10px; justify-content: center; padding: 20px; flex-wrap: wrap; }
+
+.tile {
+    width: 55px;
+    height: 80px;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s;
+    box-shadow: 4px 4px 10px rgba(0,0,0,0.5);
+    border: 2px solid transparent;
+}
+
+.tile.black { background: #000; color: #fff; border-color: #333; }
+.tile.white { background: var(--parchment); color: #000; border-color: #ccc; }
+
+.tile.hidden { color: transparent; background-image: url('https://www.transparenttextures.com/patterns/dark-leather.png'); }
+.tile.revealed { border: 3px solid var(--gold); transform: scale(1.05); }
+.tile.new-draw { animation: drawAnim 0.5s ease-out; border-color: var(--gold); }
+
+@keyframes drawAnim {
+    from { transform: translateY(-50px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+/* UI อื่นๆ */
+.seat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin: 30px; }
+.seat-btn { 
+    background: rgba(0,0,0,0.3); border: 1px solid var(--gold); color: var(--gold);
+    padding: 20px; cursor: pointer; border-radius: 5px; font-family: 'Cinzel';
+}
+.seat-btn.taken { border-color: #666; color: #666; cursor: not-allowed; }
+
+.action-btn {
+    background: var(--gold); color: var(--wood-dark);
+    border: none; padding: 12px 30px; font-family: 'Cinzel'; font-weight: bold;
+    cursor: pointer; border-radius: 3px;
+}
+
+.modal {
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+    background: rgba(0,0,0,0.85); display: flex; align-items: center; justify-content: center; z-index: 1000;
+}
+.modal-content { background: var(--wood-medium); padding: 30px; border: 2px solid var(--gold); text-align: center; }
+.guess-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 20px 0; }
